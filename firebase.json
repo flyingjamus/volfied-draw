@@ -1,0 +1,9 @@
+{
+  "firebase": "volfieddraw",
+  "public": ".",
+  "ignore": [
+    "firebase.json",
+    "**/.*",
+    "**/node_modules/**"
+  ]
+}

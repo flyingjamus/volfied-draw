@@ -1,0 +1,12 @@
+#level-image {
+    display: none;
+}
+
+canvas {
+    width: 640px;
+    height: 400px;
+}
+
+#dosbox-progress-indicator {
+    display: none;
+}
