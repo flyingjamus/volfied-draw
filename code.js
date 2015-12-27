@@ -2,9 +2,7 @@
   'use strict';
   var WIDTH = 640;
   var HEIGHT = 400;
-  var SPEED = 6;
-  var XPPS = 640 / SPEED;
-  var YPPS = 400 / SPEED;
+  var SPEED = 170;
 
   var KEYCODES = {
     UP: 38,
@@ -70,13 +68,13 @@
         lastTimeStamp = currentTimeStamp;
 
         if (pressedKey == KEYCODES.UP) {
-          y -= diff * YPPS;
+          y -= diff * SPEED;
         } else if (pressedKey == KEYCODES.DOWN) {
-          y += diff * YPPS;
+          y += diff * SPEED;
         } else if (pressedKey == KEYCODES.LEFT) {
-          x -= diff * XPPS;
+          x -= diff * SPEED;
         } else if (pressedKey == KEYCODES.RIGHT) {
-          x += diff * XPPS;
+          x += diff * SPEED;
         }
 
         x = Math.max(Math.min(x, WIDTH), 0);
@@ -149,7 +147,7 @@
       null,
       new DosBoxLoader(DosBoxLoader.emulatorJS('/libs/dosbox.js'),
         DosBoxLoader.nativeResolution(WIDTH, HEIGHT),
-        DosBoxLoader.mountZip("c", DosBoxLoader.fetchFile('Game File', 'Volfied_1991.zip')),
+        DosBoxLoader.mountZip("c", DosBoxLoader.fetchFile('Game File', 'libs/Volfied_1991.zip')),
         DosBoxLoader.startExe('Volfied/VOLFIED.EXE')));
     emulator.start({ waitAfterDownloading: false });
 
