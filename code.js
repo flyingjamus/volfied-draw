@@ -11,6 +11,14 @@
     RIGHT: 39
   };
 
+  var CHECK = {
+    x: 0,
+    y: 90 * 4,
+    width: 40 * 4,
+    height: 40 * 4,
+    jump: 2
+  };
+
   var x;
   var y;
 
@@ -23,32 +31,34 @@
     return hiddenCanvas.getContext('2d').getImageData(0, 0, WIDTH, HEIGHT);
   }
 
+  function sameImages(image1, image2) {
+    var i;
+    var j;
+    var currentIndex;
+    for (i = CHECK.x; i <= CHECK.x + CHECK.width; i = i + CHECK.jump) {
+      for (j = CHECK.y; j <= CHECK.y + CHECK.height; j = j + CHECK.jump) {
+        currentIndex = j * WIDTH * 4 + i;
+        if (image1[currentIndex] !== image2[currentIndex]) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   function callOnSimilarImage(context, originalImageData, callback) {
-    var same = false;
-    var interval = 200;
+    var INTERVAL = 200;
 
     function resembleLoop(newTimeStamp) {
       var diff = newTimeStamp - lastTimeStamp;
-      if (diff > interval) {
+      if (diff > INTERVAL) {
         lastTimeStamp = newTimeStamp;
         var imageData = context.getImageData(0, 0, WIDTH, HEIGHT);
-        resemble(originalImageData)
-          .compareTo(imageData)
-          .ignoreColors()
-          .onComplete(function(data) {
-            if (data.misMatchPercentage >= 0.7) {
-              same = false;
-              interval = 200;
-            } else if (!same) {
-              callback.call();
-              same = true;
-              interval = 3000;
-            }
-            requestAnimationFrame(resembleLoop);
-          })
-      } else {
-        requestAnimationFrame(resembleLoop);
+        if (sameImages(originalImageData.data, imageData.data)) {
+          callback.call();
+        }
       }
+      requestAnimationFrame(resembleLoop);
     }
 
     var lastTimeStamp = performance.now();
@@ -63,22 +73,36 @@
     function loop(currentTimeStamp) {
       var diff = (currentTimeStamp - lastTimeStamp) / 1000;
       var pressedKey = pressedKeys.slice(-1)[0];
-      if (isValidDirectionKey(pressedKey)) {
+      if (diff < isValidDirectionKey(pressedKey)) {
         looping = true;
         lastTimeStamp = currentTimeStamp;
 
         if (pressedKey == KEYCODES.UP) {
           y -= diff * SPEED;
+          if (y < 0) {
+            y += HEIGHT;
+            drawingContext.moveTo(x, HEIGHT);
+          }
         } else if (pressedKey == KEYCODES.DOWN) {
           y += diff * SPEED;
+          if (y > HEIGHT) {
+            y -= HEIGHT;
+            drawingContext.moveTo(x, 0);
+          }
         } else if (pressedKey == KEYCODES.LEFT) {
           x -= diff * SPEED;
+          if (x < 0) {
+            x +=  WIDTH;
+            drawingContext.moveTo(WIDTH, y);
+          }
         } else if (pressedKey == KEYCODES.RIGHT) {
           x += diff * SPEED;
+          if (x > WIDTH) {
+            x -= WIDTH;
+            drawingContext.moveTo(0, y);
+          }
         }
 
-        x = Math.max(Math.min(x, WIDTH), 0);
-        y = Math.max(Math.min(y, HEIGHT), 0);
         drawingContext.lineTo(x, y);
         drawingContext.stroke();
 
@@ -102,7 +126,7 @@
       var keyCode = e.keyCode;
       if (isValidDirectionKey(keyCode)) {
         pressedKeys = pressedKeys.filter(function(key) {
-          return key !== keyCode;
+          return key != keyCode;
         });
       }
     };
