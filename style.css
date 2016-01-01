@@ -2,11 +2,17 @@
     display: none;
 }
 
-canvas {
+canvas, svg {
     width: 640px;
     height: 400px;
 }
 
+svg {
+    fill: none;
+    stroke: #CECECE;
+}
+
 #dosbox-progress-indicator {
     display: none;
+    color: gray;
 }

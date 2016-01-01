@@ -11,101 +11,100 @@
     RIGHT: 39
   };
 
-  var CHECK = {
-    x: 0,
-    y: 90 * 4,
-    width: 40 * 4,
-    height: 40 * 4,
-    jump: 2
-  };
+  var x = WIDTH / 2;
+  var y = HEIGHT;
 
-  var x;
-  var y;
+  var prevKey;
+  var svg;
 
-  function getOriginalImageData() {
-    var levelImage = document.querySelector("#level-image");
-    var hiddenCanvas = document.createElement('canvas');
-    hiddenCanvas.width = WIDTH;
-    hiddenCanvas.height = HEIGHT;
-    hiddenCanvas.getContext('2d').drawImage(levelImage, 0, 0, WIDTH, HEIGHT);
-    return hiddenCanvas.getContext('2d').getImageData(0, 0, WIDTH, HEIGHT);
+  var squiglyness;
+  var samplingRate;
+  var chaos;
+
+  function setParams() {
+    chaos = document.querySelector("#chaos-input").value;
+    squiglyness = document.querySelector("#squigly-input").value;
+    samplingRate = 1 / parseInt(document.querySelector("#fps-input").value);
   }
 
-  function sameImages(image1, image2) {
-    var i;
-    var j;
-    var currentIndex;
-    for (i = CHECK.x; i <= CHECK.x + CHECK.width; i = i + CHECK.jump) {
-      for (j = CHECK.y; j <= CHECK.y + CHECK.height; j = j + CHECK.jump) {
-        currentIndex = j * WIDTH * 4 + i;
-        if (image1[currentIndex] !== image2[currentIndex]) {
-          return false;
-        }
-      }
-    }
-    return true;
+  function randSquig() {
+    return (Math.random() - 0.5) * squiglyness;
   }
 
-  function callOnSimilarImage(context, originalImageData, callback) {
-    var INTERVAL = 200;
-
-    function resembleLoop(newTimeStamp) {
-      var diff = newTimeStamp - lastTimeStamp;
-      if (diff > INTERVAL) {
-        lastTimeStamp = newTimeStamp;
-        var imageData = context.getImageData(0, 0, WIDTH, HEIGHT);
-        if (sameImages(originalImageData.data, imageData.data)) {
-          callback.call();
-        }
-      }
-      requestAnimationFrame(resembleLoop);
-    }
-
-    var lastTimeStamp = performance.now();
-    requestAnimationFrame(resembleLoop);
+  function drawSquigly(x1, y1, x2, y2, dx1, dy1, dx2, dy2) {
+    var xDiff = (x2 - x1) / 3;
+    var yDiff = (y2 - y1) / 3;
+    dx1 = dx1 || randSquig();
+    dy1 = dy1 || randSquig();
+    dx2 = dx2 || randSquig();
+    dy2 = dy2 || randSquig();
+    drawBezier(x1, y1, x1 + xDiff + dx1, y1 + yDiff + dy1, x1 + xDiff * 2 + dx2, y1 + yDiff * 2 + dy2, x2, y2);
   }
 
-  function handleKeys(drawingContext) {
+  function drawBezier(x1, y1, x2, y2, x3, y3, x4, y4) {
+    var path = 'M' + x1 + ',' + y1 + ' C' + x2 + ',' + y2 + ' ' + x3 + ',' + y3 + ' ' + x4 + ',' + y4;
+    svg.path(path)
+  }
+
+  function handleKeys() {
     var pressedKeys = [];
     var lastTimeStamp;
     var looping = false;
 
     function loop(currentTimeStamp) {
+      lastTimeStamp = lastTimeStamp || currentTimeStamp;
       var diff = (currentTimeStamp - lastTimeStamp) / 1000;
       var pressedKey = pressedKeys.slice(-1)[0];
-      if (diff < isValidDirectionKey(pressedKey)) {
+      if (isValidDirectionKey(pressedKey)) {
         looping = true;
-        lastTimeStamp = currentTimeStamp;
+        if (diff > samplingRate) {
 
-        if (pressedKey == KEYCODES.UP) {
-          y -= diff * SPEED;
+          lastTimeStamp = currentTimeStamp;
+          var prevX = x;
+          var prevY = y;
+          var speed = pressedKey === prevKey ? SPEED : SPEED / 2;
+          if (pressedKey == KEYCODES.UP) {
+            y -= diff * speed;
+          } else if (pressedKey == KEYCODES.DOWN) {
+            y += diff * speed;
+          } else if (pressedKey == KEYCODES.LEFT) {
+            x -= diff * speed;
+          } else if (pressedKey == KEYCODES.RIGHT) {
+            x += diff * speed;
+          }
+          if (pressedKey !== prevKey) {
+            if (prevKey === KEYCODES.UP) {
+              y -= diff * speed;
+            } else if (prevKey === KEYCODES.DOWN) {
+              y += diff * speed;
+            } else if (prevKey === KEYCODES.LEFT) {
+              x -= diff * speed;
+            } else if (prevKey === KEYCODES.RIGHT) {
+              x += diff * speed;
+            }
+          }
+          x = x + randSquig() * chaos;
+          y = y + randSquig() * chaos;
           if (y < 0) {
             y += HEIGHT;
-            drawingContext.moveTo(x, HEIGHT);
+            prevY = HEIGHT;
           }
-        } else if (pressedKey == KEYCODES.DOWN) {
-          y += diff * SPEED;
           if (y > HEIGHT) {
             y -= HEIGHT;
-            drawingContext.moveTo(x, 0);
+            prevY = 0;
           }
-        } else if (pressedKey == KEYCODES.LEFT) {
-          x -= diff * SPEED;
           if (x < 0) {
-            x +=  WIDTH;
-            drawingContext.moveTo(WIDTH, y);
+            x += WIDTH;
+            prevX = WIDTH;
           }
-        } else if (pressedKey == KEYCODES.RIGHT) {
-          x += diff * SPEED;
           if (x > WIDTH) {
             x -= WIDTH;
-            drawingContext.moveTo(0, y);
+            prevX = 0;
           }
+
+          drawSquigly(prevX, prevY, x, y);
+          prevKey = pressedKey;
         }
-
-        drawingContext.lineTo(x, y);
-        drawingContext.stroke();
-
         requestAnimationFrame(loop);
       } else {
         looping = false;
@@ -137,35 +136,21 @@
     return keyCode && keyCode >= 37 && keyCode <= 40;
   }
 
-
   window.onload = function() {
 
+
     var dosboxCanvas = document.querySelector("#dosbox-canvas");
-    var drawingCanvas = document.querySelector("#drawing-canvas");
-    var drawingContext = drawingCanvas.getContext('2d');
+    var drawingSvg = document.querySelector("#drawing-svg");
+    svg = SVG(drawingSvg).size(WIDTH, HEIGHT);
 
-    drawingCanvas.width = WIDTH;
-    drawingCanvas.height = HEIGHT;
-    drawingContext.lineWidth = 7;
-    drawingContext.strokeStyle = 'yellow';
-    drawingContext.fillStyle = 'black';
-    drawingContext.shadowColor = 'white';
-    drawingContext.shadowBlur = 5;
 
-    var dosboxContext = dosboxCanvas.getContext('2d');
-    var originalImageData = getOriginalImageData();
-    callOnSimilarImage(dosboxContext, originalImageData, resetCanvas);
-
-    function resetCanvas() {
-      drawingContext.fillRect(0, 0, WIDTH, HEIGHT);
-      drawingContext.beginPath();
-      x = WIDTH / 2;
-      y = HEIGHT;
-      drawingContext.moveTo(x, y);
-    }
-
-    resetCanvas();
-    handleKeys(drawingContext);
+    handleKeys();
+    setParams();
+    document.addEventListener('keyup', setParams);
+    document.addEventListener('focusout', setParams);
+    document.querySelector("#clear-btn").addEventListener('click', function() {
+      svg.clear();
+    });
 
     var emulator = new Emulator(dosboxCanvas,
       null,

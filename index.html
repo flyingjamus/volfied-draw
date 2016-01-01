@@ -6,11 +6,32 @@
 </head>
 <body>
 <canvas id="dosbox-canvas"></canvas>
-<canvas id="drawing-canvas"></canvas>
+<!--<canvas id="drawing-canvas"></canvas>-->
+<svg id="drawing-svg" xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink"></svg>
+
 <script type="text/javascript" src="libs/es6-promise.js"></script>
 <script type="text/javascript" src="libs/browserfs.js"></script>
 <script type="text/javascript" src="libs/loader.js"></script>
+<script type="text/javascript" src="libs/svg.min.js"></script>
 <script type="text/javascript" src="code.js"></script>
 <img src="images/level.png" id="level-image">
+
+<div>
+    <label>
+        squiglyness
+        <input type="number" min="0" max="100" id="squigly-input" value="3">
+    </label>
+
+    <label>
+        fps
+        <input type="number" min="0" max="100" id="fps-input" value="20">
+    </label>
+
+    <label>
+        chaos
+        <input type="number" min="0" max="100" id="chaos-input" value="3">
+    </label>
+    <button id="clear-btn">Clear</button>
+</div>
 </body>
 </html>
