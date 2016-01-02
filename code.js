@@ -24,11 +24,11 @@
   var db;
 
   var CHECK = {
-    x: 0,
-    y: 90 * 4,
-    width: 40 * 4,
-    height: 40 * 4,
-    jump: 2
+    x: 237,
+    y: 172,
+    width: 40,
+    height: 20,
+    jump: 1
   };
 
   function getOriginalImageData() {
@@ -37,22 +37,13 @@
     hiddenCanvas.width = WIDTH;
     hiddenCanvas.height = HEIGHT;
     hiddenCanvas.getContext('2d').drawImage(levelImage, 0, 0, WIDTH, HEIGHT);
-    return hiddenCanvas.getContext('2d').getImageData(0, 0, WIDTH, HEIGHT);
+    return hiddenCanvas.getContext('2d').getImageData(CHECK.x, CHECK.y, CHECK.width, CHECK.height);
   }
 
   function sameImages(image1, image2) {
-    var i;
-    var j;
-    var currentIndex;
-    for (i = CHECK.x; i <= CHECK.x + CHECK.width; i = i + CHECK.jump) {
-      for (j = CHECK.y; j <= CHECK.y + CHECK.height; j = j + CHECK.jump) {
-        currentIndex = j * WIDTH * 4 + i;
-        if (image1[currentIndex] !== image2[currentIndex]) {
-          return false;
-        }
-      }
-    }
-    return true;
+    return image1.length === image2.length && image1.every(function(v, i) {
+        return v === image2[i];
+      });
   }
 
   function callOnSimilarImage(context, originalImageData, callback) {
@@ -62,7 +53,7 @@
       var diff = newTimeStamp - lastTimeStamp;
       if (diff > INTERVAL) {
         lastTimeStamp = newTimeStamp;
-        var imageData = context.getImageData(0, 0, WIDTH, HEIGHT);
+        var imageData = context.getImageData(CHECK.x, CHECK.y, CHECK.width, CHECK.height);
         if (sameImages(originalImageData.data, imageData.data)) {
           if (!sameImage) {
             sameImage = true;
@@ -79,18 +70,18 @@
     requestAnimationFrame(resembleLoop);
   }
 
-
-  function setParams() {
-    chaos = document.querySelector("#chaos-input").value;
-    squiglyness = document.querySelector("#squigly-input").value;
-    samplingRate = 1 / parseInt(document.querySelector("#fps-input").value);
-  }
-
   function randSquig() {
     return (Math.random() - 0.5) * squiglyness;
   }
 
   function updateData(x1, y1, x2, y2, x3, y3, x4, y4) {
+    if (!dbImage) {
+      dbImage = db.push({
+        date: Firebase.ServerValue.TIMESTAMP,
+        data: []
+      });
+      dataIndex = 0;
+    }
     var update = {};
     update[dataIndex] = {
       x1: x1,
@@ -100,25 +91,19 @@
       x3: x3,
       y3: y3,
       x4: x4,
-      y4: y4,
+      y4: y4
     };
-    if (!dbImage) {
-      console.log(12221312)
-      dbImage = db.push({
-        date: Firebase.ServerValue.TIMESTAMP,
-        data: []
-      });
-    }
     dbImage.child('data').update(update);
+    dataIndex++;
   }
 
-  function makeSquigley(x1, y1, x2, y2, dx1, dy1, dx2, dy2) {
+  function makeSquigley(x1, y1, x2, y2) {
     var xDiff = (x2 - x1) / 3;
     var yDiff = (y2 - y1) / 3;
-    dx1 = dx1 || randSquig();
-    dy1 = dy1 || randSquig();
-    dx2 = dx2 || randSquig();
-    dy2 = dy2 || randSquig();
+    var dx1 = randSquig();
+    var dy1 = randSquig();
+    var dx2 = randSquig();
+    var dy2 = randSquig();
     updateData(x1, y1, x1 + xDiff + dx1, y1 + yDiff + dy1, x1 + xDiff * 2 + dx2, y1 + yDiff * 2 + dy2, x2, y2);
   }
 
@@ -141,7 +126,6 @@
       if (isValidDirectionKey(pressedKey)) {
         looping = true;
         if (diff > samplingRate) {
-          dataIndex++;
           lastTimeStamp = currentTimeStamp;
           var prevX = x;
           var prevY = y;
@@ -224,19 +208,18 @@
   var currentImageKey;
   var currentIndex = 0;
 
-  function updateImage(imageData) {
+  function updateImage(imageData, index) {
     if (imageData) {
-      imageData.slice(currentIndex).forEach(function(data) {
+      imageData.slice(index).forEach(function(data) {
         drawBezier(data.x1, data.y1, data.x2, data.y2, data.x3, data.y3, data.x4, data.y4);
       });
-      currentIndex = imageData.length;
     }
   }
 
   function requestFullScreen(el) {
     el.style.width = '100%';
     var clientRect = el.getBoundingClientRect();
-    el.style.height = 400 * clientRect.width / 640;
+    el.style.height = HEIGHT * clientRect.width / WIDTH;
     el.style.width = clientRect.width;
     var request = (el.requestFullScreen || el.webkitRequestFullScreen || el.mozRequestFullScreen);
     request.call(el);
@@ -244,6 +227,21 @@
 
   function setPerma(link) {
     document.querySelector("#permalink").href = link;
+  }
+
+  function restoreOnUnFull(el) {
+    var prevHeight;
+    var prevWidth;
+    var clientRect = el.getBoundingClientRect();
+    prevHeight = clientRect.height;
+    prevWidth = clientRect.width;
+
+    window.addEventListener("resize", function() {
+      if (!document.isFullScreen && !document.webkitIsFullScreen && !document.mozIsFullScreen) {
+        el.style.height = prevHeight + 'px';
+        el.style.width = prevWidth + 'px';
+      }
+    });
   }
 
   function loadViewer(drawingSvg) {
@@ -256,7 +254,11 @@
         currentImageKey = imagesSnapshot.key();
         setPerma('/drawings/' + currentImageKey);
       }
-      updateImage(imagesSnapshot.val().data);
+      var data = imagesSnapshot.val().data;
+      if (data) {
+        updateImage(data, currentIndex);
+        currentIndex = data.length;
+      }
     }
 
     var path = window.location.pathname.split('/');
@@ -264,33 +266,22 @@
       db.orderByKey()
         .equalTo(path[path.length - 1])
         .limitToLast(1)
-        .on('child_changed', update)
+        .on('child_changed', update);
       db.orderByKey()
         .equalTo(path[path.length - 1])
         .limitToLast(1)
-        .on('child_added', update)
+        .on('child_added', update);
     } else {
       db.orderByChild('date')
         .limitToLast(1)
-        .on('child_changed', update)
+        .on('child_changed', update);
       db.orderByChild('date')
         .limitToLast(1)
-        .on('child_added', update)
+        .on('child_added', update);
     }
 
-    var prevHeight;
-    var prevWidth;
-    var clientRect = drawingSvg.getBoundingClientRect();
-    prevHeight = clientRect.height;
-    prevWidth = clientRect.width;
-    window.viewerFullscreen = requestFullScreen.bind(null, drawingSvg)
 
-    window.addEventListener("resize", function() {
-      if (!document.isFullScreen && !document.webkitIsFullScreen && !document.mozIsFullScreen) {
-        drawingSvg.style.height = prevHeight + 'px';
-        drawingSvg.style.width = prevWidth + 'px';
-      }
-    });
+    restoreOnUnFull(drawingSvg)
     document.querySelector("#full-screen-viewer").addEventListener('click', function(e) {
       e.preventDefault();
       requestFullScreen(drawingSvg);
@@ -307,11 +298,8 @@
     var dosboxContext = dosboxCanvas.getContext('2d');
 
     var originalImageData = getOriginalImageData();
-    handleKeys();
-
     callOnSimilarImage(dosboxContext, originalImageData, function() {
       dbImage = null;
-      dataIndex = 0;
     });
 
     var emulator = new Emulator(dosboxCanvas,
@@ -320,24 +308,15 @@
         DosBoxLoader.nativeResolution(WIDTH, HEIGHT),
         DosBoxLoader.mountZip("c", DosBoxLoader.fetchFile('Game File', 'libs/Volfied_1991.zip')),
         DosBoxLoader.startExe('Volfied/VOLFIED.EXE')));
+
     emulator.start({ waitAfterDownloading: false });
+    handleKeys();
 
-    var prevHeight;
-    var prevWidth;
-    var clientRect = dosboxCanvas.getBoundingClientRect();
-    prevHeight = clientRect.height;
-    prevWidth = clientRect.width;
 
+    restoreOnUnFull(dosboxCanvas)
     document.querySelector("#full-screen-dosbox").addEventListener('click', function(e) {
       e.preventDefault();
       requestFullScreen(dosboxCanvas);
-    });
-
-    window.addEventListener("resize", function() {
-      if (!document.isFullScreen && !document.webkitIsFullScreen && !document.mozIsFullScreen) {
-        dosboxCanvas.style.height = prevHeight + 'px';
-        dosboxCanvas.style.width = prevWidth + 'px';
-      }
     });
 
   }
