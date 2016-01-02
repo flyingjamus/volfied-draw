@@ -2,22 +2,24 @@
   'use strict';
   var WIDTH = 640;
   var HEIGHT = 400;
-  var SPEED = 170;
+  var SPEED = 170 * 3;
 
   var KEYCODES = {
     UP: 38,
     DOWN: 40,
     LEFT: 37,
-    RIGHT: 39
+    RIGHT: 39,
+    SPACE: 32
   };
 
   var x = WIDTH / 2;
   var y = HEIGHT;
+  var shouldDraw = false;
 
   var prevKey;
   var svg;
 
-  var squiglyness = 3;
+  var squiglyness = 2;
   var samplingRate = 0.05;
   var chaos = 1.5;
 
@@ -49,6 +51,7 @@
   function callOnSimilarImage(context, originalImageData, callback) {
     var INTERVAL = 200;
     var sameImage = true;
+
     function resembleLoop(newTimeStamp) {
       var diff = newTimeStamp - lastTimeStamp;
       if (diff > INTERVAL) {
@@ -74,7 +77,12 @@
     return (Math.random() - 0.5) * squiglyness;
   }
 
-  function updateData(x1, y1, x2, y2, x3, y3, x4, y4) {
+  function randChaos() {
+    return (Math.random() - 0.5) * chaos;
+  }
+
+
+  function updateData(x1, y1, x2, y2, x3, y3, x4, y4, opacity) {
     if (!dbImage) {
       dbImage = db.push({
         date: Firebase.ServerValue.TIMESTAMP,
@@ -91,7 +99,8 @@
       x3: x3,
       y3: y3,
       x4: x4,
-      y4: y4
+      y4: y4,
+      opacity: opacity
     };
     dbImage.child('data').update(update);
     dataIndex++;
@@ -100,19 +109,22 @@
   function makeSquigley(x1, y1, x2, y2) {
     var xDiff = (x2 - x1) / 3;
     var yDiff = (y2 - y1) / 3;
-    var dx1 = randSquig();
-    var dy1 = randSquig();
-    var dx2 = randSquig();
-    var dy2 = randSquig();
-    updateData(x1, y1, x1 + xDiff + dx1, y1 + yDiff + dy1, x1 + xDiff * 2 + dx2, y1 + yDiff * 2 + dy2, x2, y2);
+    var dx = randSquig();
+    var dy = randSquig();
+    updateData(x1, y1, x1 + xDiff + dx, y1 + yDiff + dy, x1 + xDiff * 2 + dx, y1 + yDiff * 2 + dy, x2, y2, opacity);
   }
 
-  function drawBezier(x1, y1, x2, y2, x3, y3, x4, y4) {
+  function drawBezier(x1, y1, x2, y2, x3, y3, x4, y4, opacity) {
+    opacity = opacity || 1;
     var path = 'M' + x1 + ',' + y1 + ' C' + x2 + ',' + y2 + ' ' + x3 + ',' + y3 + ' ' + x4 + ',' + y4;
-    svg.path(path)
+    svg.path(path).attr({ 'stroke-opacity': opacity });
   }
 
   var dataIndex = 0;
+  var opacity = 1;
+  var MIN_OPACITY = 0;
+  var constantCaosX;
+  var constantCaosY;
 
   function handleKeys() {
     var pressedKeys = [];
@@ -124,34 +136,33 @@
       var diff = (currentTimeStamp - lastTimeStamp) / 1000;
       var pressedKey = pressedKeys.slice(-1)[0];
       if (isValidDirectionKey(pressedKey)) {
+        if (!looping) {
+          opacity = MIN_OPACITY + (1 - MIN_OPACITY) * Math.random();
+        }
         looping = true;
         if (diff > samplingRate) {
           lastTimeStamp = currentTimeStamp;
           var prevX = x;
           var prevY = y;
-          var speed = pressedKey === prevKey ? SPEED : SPEED / 2;
-          if (pressedKey == KEYCODES.UP) {
-            y -= diff * speed;
-          } else if (pressedKey == KEYCODES.DOWN) {
-            y += diff * speed;
-          } else if (pressedKey == KEYCODES.LEFT) {
-            x -= diff * speed;
-          } else if (pressedKey == KEYCODES.RIGHT) {
-            x += diff * speed;
-          }
-          if (pressedKey !== prevKey) {
-            if (prevKey === KEYCODES.UP) {
-              y -= diff * speed;
-            } else if (prevKey === KEYCODES.DOWN) {
-              y += diff * speed;
-            } else if (prevKey === KEYCODES.LEFT) {
-              x -= diff * speed;
-            } else if (prevKey === KEYCODES.RIGHT) {
-              x += diff * speed;
+          if (pressedKey === prevKey) {
+            if (pressedKey == KEYCODES.UP) {
+              y -= diff * SPEED;
+            } else if (pressedKey == KEYCODES.DOWN) {
+              y += diff * SPEED;
+            } else if (pressedKey == KEYCODES.LEFT) {
+              x -= diff * SPEED;
+            } else if (pressedKey == KEYCODES.RIGHT) {
+              x += diff * SPEED;
             }
+          } else {
+            constantCaosX = randChaos() * 10;
+            constantCaosY = randChaos() * 10;
+            x += diff * SPEED * randChaos();
+            y += diff * SPEED * randChaos();
           }
-          x = x + randSquig() * chaos;
-          y = y + randSquig() * chaos;
+
+          x = x + randSquig() * chaos + constantCaosX;
+          y = y + randSquig() * chaos + constantCaosY;
           if (y < 0) {
             y += HEIGHT;
             prevY = HEIGHT;
@@ -169,7 +180,9 @@
             prevX = 0;
           }
 
-          makeSquigley(prevX, prevY, x, y);
+          if (/*shouldDraw && */pressedKey === prevKey) {
+            makeSquigley(prevX, prevY, x, y, opacity);
+          }
 
           prevKey = pressedKey;
         }
@@ -180,17 +193,26 @@
     }
 
     document.onkeydown = function(e) {
-      if (isValidDirectionKey(e.keyCode)) {
+      var keyCode = e.keyCode;
+      if (keyCode === KEYCODES.SPACE) {
+        shouldDraw = true
+      }
+      if (isValidDirectionKey(keyCode)) {
         if (!looping && !pressedKeys.length) {
           lastTimeStamp = performance.now();
           requestAnimationFrame(loop);
         }
-        pressedKeys.push(e.keyCode);
+        pressedKeys.push(keyCode);
       }
     };
 
     document.onkeyup = function(e) {
       var keyCode = e.keyCode;
+
+      if (keyCode === KEYCODES.SPACE) {
+
+        shouldDraw = false
+      }
       if (isValidDirectionKey(keyCode)) {
         pressedKeys = pressedKeys.filter(function(key) {
           return key != keyCode;
@@ -211,7 +233,7 @@
   function updateImage(imageData, index) {
     if (imageData) {
       imageData.slice(index).forEach(function(data) {
-        drawBezier(data.x1, data.y1, data.x2, data.y2, data.x3, data.y3, data.x4, data.y4);
+        drawBezier(data.x1, data.y1, data.x2, data.y2, data.x3, data.y3, data.x4, data.y4, data.opacity);
       });
     }
   }
@@ -281,7 +303,7 @@
     }
 
 
-    restoreOnUnFull(drawingSvg)
+    restoreOnUnFull(drawingSvg);
     document.querySelector("#full-screen-viewer").addEventListener('click', function(e) {
       e.preventDefault();
       requestFullScreen(drawingSvg);
@@ -289,7 +311,9 @@
 
     document.querySelector("#save-as-png").addEventListener('click', function(e) {
       e.preventDefault();
-      saveSvgAsPng(drawingSvg, 'volfied.png');
+      saveSvgAsPng(drawingSvg,
+        'volfied.png',
+        { scale: 3, backgroundColor: 'white' });
     });
   }
 
@@ -310,10 +334,11 @@
         DosBoxLoader.startExe('Volfied/VOLFIED.EXE')));
 
     emulator.start({ waitAfterDownloading: false });
+
     handleKeys();
 
 
-    restoreOnUnFull(dosboxCanvas)
+    restoreOnUnFull(dosboxCanvas);
     document.querySelector("#full-screen-dosbox").addEventListener('click', function(e) {
       e.preventDefault();
       requestFullScreen(dosboxCanvas);
