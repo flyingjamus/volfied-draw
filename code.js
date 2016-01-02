@@ -2,7 +2,6 @@
   'use strict';
   var WIDTH = 640;
   var HEIGHT = 400;
-  var SPEED = 170 * 3;
 
   var KEYCODES = {
     UP: 38,
@@ -13,15 +12,18 @@
   };
 
   var x = WIDTH / 2;
+
   var y = HEIGHT;
   var shouldDraw = false;
-
   var prevKey;
+
   var svg;
 
-  var squiglyness = 2;
-  var samplingRate = 0.05;
-  var chaos = 1.5;
+  var SPEED = 170 * 1;
+  var MIN_OPACITY = 0.5;
+  var squiglyness = 3;
+  var samplingRate = 0.2;
+  var chaos = 1;
 
   var db;
 
@@ -117,12 +119,12 @@
   function drawBezier(x1, y1, x2, y2, x3, y3, x4, y4, opacity) {
     opacity = opacity || 1;
     var path = 'M' + x1 + ',' + y1 + ' C' + x2 + ',' + y2 + ' ' + x3 + ',' + y3 + ' ' + x4 + ',' + y4;
-    svg.path(path).attr({ 'stroke-opacity': opacity });
+    svg.path(path)
+      .attr({ 'stroke-opacity': opacity });
   }
 
   var dataIndex = 0;
   var opacity = 1;
-  var MIN_OPACITY = 0;
   var constantCaosX;
   var constantCaosY;
 
@@ -155,10 +157,10 @@
               x += diff * SPEED;
             }
           } else {
-            constantCaosX = randChaos() * 10;
-            constantCaosY = randChaos() * 10;
-            x += diff * SPEED * randChaos();
-            y += diff * SPEED * randChaos();
+            constantCaosX = randChaos() * 2;
+            constantCaosY = randChaos() * 2;
+            //x += diff * SPEED * randChaos();
+            //y += diff * SPEED * randChaos();
           }
 
           x = x + randSquig() * chaos + constantCaosX;
@@ -189,6 +191,7 @@
         requestAnimationFrame(loop);
       } else {
         looping = false;
+        prevKey = null;
       }
     }
 
