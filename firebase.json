@@ -5,5 +5,15 @@
     "firebase.json",
     "**/.*",
     "**/node_modules/**"
+  ],
+  "rewrites": [
+    {
+      "source": "/drawings",
+      "destination": "/viewer.html"
+    },
+    {
+      "source": "/drawings/*",
+      "destination": "/viewer.html"
+    }
   ]
 }

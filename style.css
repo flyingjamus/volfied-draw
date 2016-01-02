@@ -12,6 +12,16 @@ svg {
     stroke: #CECECE;
 }
 
+a {
+    text-decoration: none;
+    color: #CECECE;
+    cursor: pointer;
+}
+
+a:hover {
+    color: black;
+}
+
 #dosbox-progress-indicator {
     display: none;
     color: gray;
